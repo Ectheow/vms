@@ -8,6 +8,7 @@
   (import
     (rnrs)
     (ice-9 list)
+    (assq-tools)
 ;;    (ice-9 r4rs)
     (ice-9 r5rs)
     (custom processes)
@@ -93,13 +94,14 @@
   (define (clone-vm vm)
     (let* ((new-vm-settings (clone-vm-settings vm))
 	   (new-master-settings
-	    (cons (cons
-		   (string->symbol
-		    (string-append
-		     (symbol->string vm)
-		     "-copy"))
-		    new-vm-settings)
-		  (master-vm-settings))))
+	    (acons-recursive
+	     '(vms)
+	     (master-vm-settings)
+	     (cons
+	      (string->symbol (string-append
+			       (symbol->string vm)
+			       "-copy"))
+	      new-vm-settings))))
       (write-vm-settings new-master-settings)))
   
       
