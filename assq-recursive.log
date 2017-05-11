@@ -1,0 +1,60 @@
+%%%% Starting test assq-recursive
+Group begin: assq-recursive
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 7
+  source-form: (test-equal (quote (four (five . six))) (assq-recursive (quote (one two three four)) (quote ((two (five (six . seven))) (one (five (doodle . 8)) (eight (twenty . cats) (fifty . dogs)) (two (six . seven) (three (four (five . six)))) (five . eight))))))
+Test end:
+  result-kind: pass
+  actual-value: (four (five . six))
+  expected-value: (four (five . six))
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 17
+  source-form: (test-equal #f (assq-recursive (quote (one two)) (quote ())))
+Test end:
+  result-kind: pass
+  actual-value: #f
+  expected-value: #f
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 21
+  source-form: (test-error &error (assq-recursive (quote ()) (quote ((one . two)))))
+Test end:
+  result-kind: pass
+  actual-error: (r6rs:exception #<r6rs:record:&raise-object-wrapper>)
+  expected-error: #<r6rs:record-type:&error>
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 25
+  source-form: (test-error &error (assq-recursive (quote (one two)) (quote (one two three))))
+Test end:
+  result-kind: pass
+  actual-error: (r6rs:exception #<r6rs:record:&raise-object-wrapper>)
+  expected-error: #<r6rs:record-type:&error>
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 29
+  source-form: (test-equal #f (assq-recursive (quote (one two)) (quote ((one (three . four)) (two . five)))))
+Test end:
+  result-kind: pass
+  actual-value: #f
+  expected-value: #f
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 34
+  source-form: (test-equal (quote (one . two)) (assq-recursive (quote (one)) (quote ((one . two)))))
+Test end:
+  result-kind: pass
+  actual-value: (one . two)
+  expected-value: (one . two)
+Test begin:
+  source-file: "/home/john/hlinux/vms/assq-tests.scm"
+  source-line: 39
+  source-form: (test-equal (quote (four . five)) (assq-recursive (quote (one two four)) (quote ((one (two (four . five)))))))
+Test end:
+  result-kind: pass
+  actual-value: (four . five)
+  expected-value: (four . five)
+Group end: assq-recursive
+# of expected passes      7
