@@ -681,88 +681,495 @@ or
 which, if the key path (one two three) exists in it's entirety, adds
 the key/value (four . five) to the alist-of-alists at that point,
 otherwise, it gives an error.
+;; a path-and-key is:
+
+1. (cons a b) where a and b are any atomic values
+2. (cons pc pk) where pc is a symbol and pk is a path-and-key
+
+;; assq-cons : alist-of-alists path-and-key -> alist-of-alists 
+;; add the key/value pair to the keypath specified.
 
 examples:
-(aconsr
- '(one two three . (four . five))
- '( (one . ( (two . ( (three . ())))))))
-'( (one . ( (two . ( (three . (four . five)))))))
-(aconsr
- '(one . two)
- '())
-'((one . two))
-(aconsr
- '(one two three . (four . five))
- '( (doodle . ( (daddle . deedle)))
-    (one . ( (two . (
-		     (six . seven)
-		     (three . ())))))))
-'(
-		  
+(equal? 
+  (aconsr
+   '(one two three four) 
+   'five
+   '( (one . ( (two . ( (three . ())))))))
+
+  '( (one . ( (two . ( (three . (four . five))))))))
+
+(equal?
+ (aconsr
+  '(one)
+  'two
+  '())
+ '( (one . two) ))
+
+(equal? 
+ (aconsr
+  '(one two three)
+  'four
+  '( (one . ( (two . ()) ) ) (four . six)))
+ '( (one . ( (two . (three . four)) ) ( four . six))))
+
+Possible combinations:
+data definitions
+alist:
+1. '()
+2. (cons pair alist) where pair is a pair and alist is an alist.
+
+alist-of-alists:
+1. '()
+2. (cons (cons key alist1) alist2) where alist1 and alist2 are alist-of-alists.
+3. (cons (cons key noa) alist2) where noa is not an alist - i.e. it
+doesn't match the form (cons (cons any any) alist).
+( ( one . ( ( two . (1 2 3)))))
 
 
+1. (cons a '()) where a is a key value
+2. (cons s kl) where s is a key value and kl is a keylist
+
+key values are atoms.
+
+We are not 'processing' value,  just putting it in.
+
+cases:
+|                           |(null? alol)                             |  (and (alist? lol) (alist? (cdar alol)))                           | (and (alist? alol) (not (alist? (cdar alol))))|
+|(null? (cdr keylist))      |(and (null? (cdr keylist)) (null? alol)) |(and (null? (cdr keylist)) (and (alist? lol) (alist? (cdar alol)))) | (and (null? (cdr keylist)) (and (alist? alol) (not (alist? (cdar alol)))))
+|(not (null? (cdr keylist)))|(and (not (null? (cdr keylist0))) (null? alol)) | (and (not (null? (cdr keylist))) (and (alist? alol) (alist? (cdar alol)))) | (and (not (null? (cdr keylist))) (and (alist? alol) (not (alist? (cdar alol))))) |
+
+We can fill these out:
 |#
-  (define (assq-recursive
+(define (aconsr keylist value alol)
+  (cond
+   ((and (null? (cdr keylist))
+	 (null? alol))
+    ...(car keylist) ...)
+   ((and (null? (cdr keylist))
+	(and (alist? alol)
+	     (alist? (cdar alol))))
+    ... (car keylist) ...
+    ... (cdr alist) ...
+    ... (cdr (car alist)) ...
+    ... (car (car alist)) ...)
+   ((and (null? (cdr keylist))
+	 (and (alist? alol)
+	      (not (alist? (cdar alol)))))
+    ... (car keylist) ...
+    ... (cdr alol) ...
+    ... (car (car alol)) ...
+    ... (cdr (car alol)) ...)
+   ((and (not (null? (cdr keylist)))
+	 (null? alol))
+    ... (car keylist) ...
+    ... (cdr keylist) ...)
+   ((and (not (null? (cdr keylist)))
+	 (and (alist? alol)
+	      (alist? (cdar alol))))
+    ... (car keylist) ...
+    ... (cdr keylist) ...
+    ... (cdr alol) ...
+    ... (car (car alol)) ...
+    ... (cdr (car alol)) ...)
+   ((and (not (null? (cdr keylist)))
+	 (and (alist? alol)
+	      (not (alist? (cdar alol)))))
+    ... (car keylist) ...
+    ... (cdr keylist) ...
+    ... (cdr alist) ...
+    ... (car (car alist)) ...
+    ... (cdr (car alist)) ...)))
+#|
+Next we should annotate with possible recursions. We can see that for
+the most complex case, where all the values of the alist are alists
+except for the key and the keylist is a full list, we have:
+
+(aconsr (cdr keylist) value alol)
+(aconsr (cdr keylist) vlaue (cdr alol))
+(aconsr keylist value (cdr alol))
+(aconsr keylist value (cdr (car alol)))
+(aconsr (cdr keylist) value (cdr (car alol)))
+
+Only some of these will make sense.
+|#
+    
+(define (aconsr keylist value alol)
+  (cond
+   ((and (null? (cdr keylist))
+	 (null? alol))
+    ...(car keylist) ...)
+   ((and (null? (cdr keylist))
+	(and (alist? alol)
+	     (alist? (cdar alol))))
+    ... (car keylist) ...
+    ... (car (car alist)) ...
+    ;; cdr keylist doesn't make sense since it is null.
+    (aconsr keylist value (cdr alist))
+    (aconsr keylist value (cdr (car alist))))
+   ((and (null? (cdr keylist))
+	 (and (alist? alol)
+	      (not (alist? (cdar alol)))))
+    ... (car keylist) ...
+    ... (car (car alol)) ...
+    ... (cdr (car alol)) ...
+    (aconsr keylist value (cdr alol)))
+   ((and (not (null? (cdr keylist)))
+	 (null? alol))
+    ;; no possible recursions with null alol.
+    ... (car keylist) ...
+    (aconsr (cdr keylist) value alol)
+    ... (cdr keylist) ...)
+   ((and (not (null? (cdr keylist)))
+	 (and (alist? alol)
+	      (alist? (cdar alol))))
+    ... (car keylist) ...
+    ... (car (car alol)) ...
+    (aconsr keylist value (cdr alol))
+    (aconsr keylist value (cdr (car alol)))
+    (aconsr (cdr keylist) value (cdr alol))
+    (aconsr (cdr keylist) value (cdr (car alol)))
+    (aconsr (cdr keylist) value alol))
+   ((and (not (null? (cdr keylist)))
+	 (and (alist? alol)
+	      (not (alist? (cdar alol)))))
+    ... (car keylist) ...
+    ... (cdr (car alol)) ...
+    ... (car (car alol)) ...
+    (aconsr keylist (cdr alol))
+    (aconsr (cdr keylist) (cdr alol))
+    (aconsr (cdr keylist) alol))))
+   
+#|
+Now we can begin filling it in, by looking at examples. 
+
+For example, we know that we said to make an application of error if
+we get a keylist that is more than one item (non-null cdr) with a null
+alol. This covers the first two cases, where there is an item in
+keylist but nothing in alol.
+
+If alol is empty and the keylist is a single value, we just return
+(list (cons key value)).
+
+This leaves us with more complex cases. 
+
+If the keylist has one item:
+
+(equal? (aconsr '(one) 'two '())
+'( (one . two) ))
+(equal? (aconsr '(one) 'two '( (three . four)))
+         '( (one . two) (three . four)))
+(equal? (aconsr '(a) 2 '( (a . one) ))
+        '( (a . 2) (a . one)))
+(equal? (aconsr '(six) 'seven '( (one . two) (three . four)))
+	'( (six . seven) (one . two) (three . four)))
+(equal? (aconsr '(six) 'seven '( (one . ( (two . three) ))))
+        '( (six . seven) ( (one . ( (two . three))))))
+
+No matter what, we just return 
+(cons (cons key value) alol)
+
+very simple. This covers fully half of the cases. Note there is a
+possibility for bizarre behavior that we don't plan for: a key is
+already in the list, but we hit the end early, i.e.
+
+(aconsr '(six) 'seven '( (six . ten)))
+would return
+'( (six . seven) (six . ten)).
+
+This should be checked for first, our function doesn't handle that.
+
+Next, we worry about a keylist with more than one element. If the
+keylist has multiple elements, i.e. non-null cdr, but the alist is
+empty, this is an error because the first part of teh path is not in
+the alist.
+
+(aconsr '(a b c) 2 '())
+;; error.
+
+Next, we have a non-null-cdr keylist, with a non-null alol and also an
+alol whose cdr-car is itself an alist, and a non-null-cdr keylist
+whose alol's cdr-car is not an alist.
+
+1. (and (not (null? (cdr keylist))) 
+        (and (alist? alol)
+             (alist? (cdr (car alol)))))
+   
+   example call (aconsr '(one two) 'six '( (five . ( (two . three)))))
+   correct return value is an error.
+
+   example call (aconsr '(one two) 'six '( (one . ( (three . four)))))
+. five)))))))
+   correct value '( (one . ( (two . six ) (three . four))))
+
+   possible recursions
+
+   1. (aconsr (cdr keylist) value alol)
+      (aconsr '(two) 'six '( (five . ( (two . three)))))
+    
+       This defers to a previous case where we decided we would just
+       cons the first of the keylist and the value onto the result
+       and would return - 
+
+       '( (two . six) (five . ( (two . three))))
+ 
+       We cannot make correct output from this, it did not detect the
+       error. 
+
+   2. (aconsr (cdr keylist) value (cdr alol))
+      (aconsr '(two) 'six '())
+      
+      Again this hits on the unconditional cons clause and returns
+
+      '( (two . six)).
+
+      we cannot make the correct output.
+
+   3. (aconsr keylist value (cdr alol))
+ 
+      (aconsr '(one two) 'six '())
+
+      This will signal an error because of a multiple-value keylist
+      and an empty alol. This is correct. If the value was there in
+      the cdr
+
+      (aconsr '(one two) 'six '( (four . five) (one . ( (three . four )))))
+      we would call
+      (aconsr '(one two) 'six '( one . ( (three . four))))
+      which assuming it is a correct function is
+      '( (one . ( (two . six) (three . four))))
+      which isn't our entire output for our function call. We were
+     called with
+
+      '( (four . five) ...)
+      and should produce
+      '( (four . five) (one . ( (two . six) (three . four ))))
+      we have '( (one . ( (two . six) (three . four))))
+      so we need to do
+      (cons (car alol) 
+            (aconsr keylist value (cdr alol)))
+       
+
+   4. (aconsr (cdr keylist) value (cdr (car alol)))
+     
+      (aconsr '(two) 'six '( (two . three) ))
+
+      This is for this case not correct because 'five does not match
+      'one. However if it had (and it might):
+
+      input:
+      (aconsr '(one two) 'six '( (one . ())))
+      expected:
+      '( (one . ( (two . six ))))
+      
+      if we used this recursion:
+      (aconsr '(two) 'six '())
+      which will return (correctly)
+      '(two . six)
+
+      We have car alol -- caar alol and cdar alol --  and cdr alol.
+      To create correct output:
+      (cons (cons (caar alol) (aconsr (cdr keylist) value 
+                                                    (cdar alol)))     
+             (cdr alol))
+
+       This creates the correct output for the case where the path matches.
+
+      
+
+     
+
+      
+     (cond ((equal? (caar alol) (car keylist))
+            (cons (cons (caar alol)
+                        (aconsr 
+                         (cdr keylist) 
+                         value (cdr (car alol))))
+                  (cdr alol)))
+           (else (cons (car alol)
+                       (aconsr keylist value (cdr alol)))))
+
+     Note that there is a possibility  -- our data definition has not
+     outlawed it -- that an alist-of-alists has multiple keys and that
+     a latter could have a full path and still be compliant with the
+     data definition. For now we will specify that this type of
+     alist-of-alists is illegal and no sane person would use it.
+
+     Finally, we need to make sure we return the right value after our
+     recursive call. We need to reconstruct the entire list, so we
+     need to add back on what we deconstructed.
+
+     We deconstructed the value of the current alist cell, so we need
+     to use the new one provided.
+   
+     (cons (caar alol) 
+           (aconsr (cdr keylist) value (cdar alol)))
+
+     Then we also need to reconstruct the rest of the alist
+ 
+     (cons (cons (caar alol) (aconsr (cdr keylist) alue (cdar alol)))
+           (cdr alol))
+
+
+2. (and (not (null? (cdr keylist)))
+        (and (alist? alol)
+             (not (alist? (cdar alol)))))
+
+   In this case we simply don't need to worry about the cdr car of
+   alol being a possible alist. Since we can't recurse into it, there
+   are fewer possible recursions:
+
+   (aconsr (cdr keylist) vlaue (cdr alol))
+   (aconsr keylist value (cdr alol))
+
+   However, we may want to signal an error if the car-car of the alol
+   matches the car of the keylist, this is undesirable. The user
+   should not have more than two keys in the same level of the list
+   but validating this is currently beyond our scope.
+
+   Example:
+   (aconsr '(one two) 'five '( (one . two)))
+   ;; error
+   (aconsr '(one two) 'five '( (seven . eight) (nine . (
+                              (ten.eleven))))) 
+   ;; error
+   (aconsr '(one two) 'five '( (seven . eight) (one . ())))
+   '( (seven . eight) (one . ( (two . five))))
+   ;; In this case
+
+   (aconsr (cdr keylist) value (cdr alol)) is
+   (aconsr '(two) 'five '( (one . ())))
+   which would be a single-element-keylist clause, which would give us
+   '( (two . five) (one . ()))
+   not correct.
+
+   The other alternative is
+   (aconsr keylist value (cdr alol))
+   which is
+   (aconsr '(one two) 'five '( (one . ())))
+   which would see the 'one is a first element of the keylist, and
+   give us a value we can make the correcr result out of.
+
+   so:
+
+   (cond ((equal? (caar alol) (car keylist))
+          (error 'aconsr "keypath not in alist"
+                         alol keylist))
+         (else (cons (car alol)
+                     (aconsr keylist value (cdr alol)))))
+
+   This gives us all cases.
+|#
+
+(define (aconsr keylist value alol)
+  (cond
+   ((and (null? (cdr keylist))
+	 (null? alol))
+    (cons (cons (car keylist) value) '()))
+   ((and (null? (cdr keylist))
+	(and (alist? alol)
+	     (alist? (cdar alol))))
+    (cons (cons (car keylist) value) alol))
+   ((and (null? (cdr keylist))
+	 (and (alist? alol)
+	      (not (alist? (cdar alol)))))
+    (cons (cons (car keylist) value) alol))
+   ((and (not (null? (cdr keylist)))
+	 (null? alol))
+    ;; no possible recursions with null alol.
+    (error 'aconsr "this key path isn't in the alist-of-alists"
 	   keylist
-	   alol)
+	   alol))
+   ((and (not (null? (cdr keylist)))
+	 (and (alist? alol)
+	      (alist? (cdar alol))))
     (cond
-     ((and (null? (cdr keylist)) (pair? alol))
-      (cond
-       ((equal? (car keylist)
-		(caar alol))
-	(car alol))
-       (else #f)))
-     ((and (pair? keylist) (pair? alol))
+     ((equal? (caar alol) (car keylist))
+      (aconsr (cdr keylist) value (cdr (car alol))))
+     (else (aconsr (cdr keylist) value (cdr alol)))))
+   ((and (not (null? (cdr keylist)))
+	 (and (alist? alol)
+	      (not (alist? (cdar alol)))))
+    (cond ((equal? (caar alol) (car keylist))
+	   (error 'aconsr "keypath not in alist"
+		  alol keylist))
+	  (else (aconsr keylist value (cdr alol)))))))
+
+#|
+Reduction:
+
+our aconsr returns the same results - 
+(cons (cons (car keylist) value) alol)
+in three cases, the first three. We can consolidate these into one
+case:
+
+(or (and (null? (cdr keylist))
+         (null? alol))
+    (and (null? (cdr keylist))
+         (and (alist? alol)
+              (alist? (cdar alol))))
+    (and (null? (cdr keylist))
+         (and (alist? alol)
+              (not (alist? (cdar alol))))))
+
+to which our answer is
+(cons (cons (car keylist) value) alol)
+
+we can pull out a common case:
+
+(and (null? (cdr keylist))
+     (or (null? alol)
+         (and (alist? alol)
+              (alist? (cdar alol)))
+         (and (alist? alol)
+              (not (alist? (cdar alol))))))
+
+As for the second part of the and, this actually covers every possible
+value for alist, since it covers all clauses of the data
+definition. Our condition becomes:
+
+(null? (cdr keylist))
+|#
+
+  (define (aconsr keylist value alol)
+    (cond
+     ((null? (cdr keylist))
+      (cons (cons (car keylist) value) alol))
+     ((and (not (null? (cdr keylist)))
+	   (null? alol))
+      ;; no possible recursions with null alol.
+      (error 'aconsr "this key path isn't in the alist-of-alists"
+	     keylist
+	     alol))
+     ((and (not (null? (cdr keylist)))
+	   (and (alist? alol)
+		(alist? (cdar alol))))
       (cond
        ((equal? (caar alol) (car keylist))
-	(let ((result-of-value (assq-recursive
-				(cdr keylist)
-				(cdar alol))))
-	  (if result-of-value
-	      result-of-value
-	      (assq-recursive
-	       keylist
-	       (cdr alol)))))
+	(cons 
+	 (cons
+	  (caar alol)
+	  (aconsr (cdr keylist) value (cdr (car alol))))
+	 (cdr alol)))
        (else
-	(assq-resursive keylist (cdr alol)))))
-     ((and (pair? keylist) (null? alol)) #f)))
+	(cons (car alol)
+	      (aconsr keylist value (cdr alol))))))
+     ((and (not (null? (cdr keylist)))
+	   (and (alist? alol)
+		(not (alist? (cdar alol)))))
+      (cond ((equal? (caar alol) (car keylist))
+	     (error 'aconsr "keypath not in alist"
+		    alol keylist))
+	    (else (cons (car alol)
+			(aconsr keylist value (cdr alol)))))))) 
+
+    
+             
+	       
+
+
+
        
-  (define (acons-recursive
-	   keylist
-	   alol
-	   kv)
-    "acons-recursive : list-of-keys alist-of-alists value
-add a value to an alist-of-alists by the key list, e.g.
-(equal?
- (acons-recursive '(one two four) '( (one . ( (two . ( (three . 4)))))) 5)
- '(one . ( (two . ( (three . 4) (four . 5))))))
-(equal?
- (acons-recursive '(cat dog rat)
-		  '( (cat . 
-			  ( (dog . ( (mouse . dood))))))
-		  rood)
- '( (cat . 
-	 ( (dog . ( (mouse . dood)
-		    (rat . rood)))))))"
-(cond
- ((and (pair? keylist) (pair? alol))
-  (cond
-   ((and
-     (equal? (car keylist) (caar alol))
-     (list? (cdar alol)))
-    (cons
-     (cons (caar alol)
-	   (acons-recursive (cdr keylist) (cdar alol) kv))
-     (cdr alol)))
-   (else
-    (cons (car alol)
-	  (acons-recursive keylist (cdr alol) kv)))))
- ((and (null? keylist) (pair? alol))
-  (cons kv alol))
- ((and (pair? keylist) (null? alol))
-  (error 'acons-recursive "key not found" keylist))
- ((and (null? alol) (null? keylist))
-  (cons kv alol)))))
+
 
 
 
